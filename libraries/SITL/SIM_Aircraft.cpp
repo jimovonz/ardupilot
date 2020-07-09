@@ -341,8 +341,8 @@ void Aircraft::fill_fdm(struct sitl_fdm &fdm)
         // initialise home
         fdm.home = home;
     }
-    fdm.latitude  = location.lat * 1.0e-7;
-    fdm.longitude = location.lng * 1.0e-7;
+    fdm.latitude  = location.lat * 1.0e-7 + (location.lat_hp * 1.0e-9);
+    fdm.longitude = (location.lng * 1.0e-7) + (location.lng_hp * 1.0e-9);
     fdm.altitude  = location.alt * 1.0e-2;
     fdm.heading   = degrees(atan2f(velocity_ef.y, velocity_ef.x));
     fdm.speedN    = velocity_ef.x;
@@ -424,7 +424,7 @@ void Aircraft::fill_fdm(struct sitl_fdm &fdm)
             fdm.quaternion.from_rotation_matrix(m);
         }
     }
-    
+
     if (!is_equal(last_speedup, float(sitl->speedup)) && sitl->speedup > 0) {
         set_speedup(sitl->speedup);
         last_speedup = sitl->speedup;
@@ -602,8 +602,8 @@ void Aircraft::update_dynamics(const Vector3f &rot_accel)
 void Aircraft::update_wind(const struct sitl_input &input)
 {
     // wind vector in earth frame
-    wind_ef = Vector3f(cosf(radians(input.wind.direction))*cosf(radians(input.wind.dir_z)), 
-                       sinf(radians(input.wind.direction))*cosf(radians(input.wind.dir_z)), 
+    wind_ef = Vector3f(cosf(radians(input.wind.direction))*cosf(radians(input.wind.dir_z)),
+                       sinf(radians(input.wind.direction))*cosf(radians(input.wind.dir_z)),
                        sinf(radians(input.wind.dir_z))) * input.wind.speed;
 
     wind_ef.z += get_local_updraft(position);

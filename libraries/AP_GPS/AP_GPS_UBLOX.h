@@ -26,7 +26,7 @@
 #include "GPS_Backend.h"
 
 /*
- *  try to put a UBlox into binary mode. This is in two parts. 
+ *  try to put a UBlox into binary mode. This is in two parts.
  *
  * First we send a ubx binary message that enables the NAV_SOL message
  * at rate 1. Then we send a NMEA message to set the baud rate to our
@@ -144,7 +144,7 @@ public:
 
     // ublox specific healthy checks
     bool is_healthy(void) const override;
-    
+
 private:
     // u-blox UBX protocol essentials
     struct PACKED ubx_header {
@@ -292,6 +292,23 @@ private:
         uint32_t horizontal_accuracy;
         uint32_t vertical_accuracy;
     };
+    struct PACKED ubx_nav_hpposllh {
+        uint8_t version;
+        uint16_t reserved;
+        uint8_t flags;
+        uint32_t itow;                                  // GPS msToW
+        int32_t longitude;
+        int32_t latitude;
+        int32_t altitude_ellipsoid;
+        int32_t altitude_msl;
+        int8_t lonHp;
+        int8_t latHp;
+        int8_t heightHp;
+        int8_t hMSLHp;
+        uint32_t horizontal_accuracy;
+        uint32_t vertical_accuracy;
+      };
+
     struct PACKED ubx_nav_status {
         uint32_t itow;                                  // GPS msToW
         uint8_t fix_type;
@@ -331,27 +348,27 @@ private:
         uint32_t res2;
     };
     struct PACKED ubx_nav_pvt {
-        uint32_t itow; 
-        uint16_t year; 
-        uint8_t month, day, hour, min, sec; 
-        uint8_t valid; 
-        uint32_t t_acc; 
-        int32_t nano; 
-        uint8_t fix_type; 
-        uint8_t flags; 
-        uint8_t flags2; 
-        uint8_t num_sv; 
-        int32_t lon, lat; 
-        int32_t height, h_msl; 
-        uint32_t h_acc, v_acc; 
-        int32_t velN, velE, velD, gspeed; 
-        int32_t head_mot; 
-        uint32_t s_acc; 
-        uint32_t head_acc; 
-        uint16_t p_dop; 
-        uint8_t reserved1[6]; 
+        uint32_t itow;
+        uint16_t year;
+        uint8_t month, day, hour, min, sec;
+        uint8_t valid;
+        uint32_t t_acc;
+        int32_t nano;
+        uint8_t fix_type;
+        uint8_t flags;
+        uint8_t flags2;
+        uint8_t num_sv;
+        int32_t lon, lat;
+        int32_t height, h_msl;
+        uint32_t h_acc, v_acc;
+        int32_t velN, velE, velD, gspeed;
+        int32_t head_mot;
+        uint32_t s_acc;
+        uint32_t head_acc;
+        uint16_t p_dop;
+        uint8_t reserved1[6];
         uint32_t headVeh;
-        uint8_t reserved2[4]; 
+        uint8_t reserved2[4];
     };
     struct PACKED ubx_nav_relposned {
         uint8_t version;
@@ -519,6 +536,7 @@ private:
     union PACKED {
         DEFINE_BYTE_ARRAY_METHODS
         ubx_nav_posllh posllh;
+        ubx_nav_hpposllh hpposllh;
         ubx_nav_status status;
         ubx_nav_dop dop;
         ubx_nav_solution solution;
@@ -575,6 +593,7 @@ private:
         MSG_ACK_NACK = 0x00,
         MSG_ACK_ACK = 0x01,
         MSG_POSLLH = 0x2,
+        MSG_HPPOSLLH = 0x14,
         MSG_STATUS = 0x3,
         MSG_DOP = 0x4,
         MSG_SOL = 0x6,
@@ -709,9 +728,10 @@ private:
     bool _cfg_needs_save;
 
     bool noReceivedHdop;
-    
-    bool havePvtMsg;
 
+    bool havePvtMsg;
+    bool haveHpposMsg;
+    
     bool        _configure_message_rate(uint8_t msg_class, uint8_t msg_id, uint8_t rate);
     bool        _configure_valset(ConfigKey key, const void *value);
     bool        _configure_valget(ConfigKey key);

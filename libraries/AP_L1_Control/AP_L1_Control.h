@@ -124,6 +124,8 @@ private:
     uint32_t _last_update_waypoint_us;
     bool _data_is_stale = true;
 
+    float last_xtrack = 0.0f;
+
     AP_Float _loiter_bank_limit;
 
     bool _reverse = false;
