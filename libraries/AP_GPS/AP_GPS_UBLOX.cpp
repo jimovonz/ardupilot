@@ -1215,12 +1215,14 @@ AP_GPS_UBLOX::_parse_gps(void)
             break;
         }
         _check_new_itow(_buffer.posllh.itow);
-        _last_pos_time        = _buffer.posllh.itow;
-        state.location.lng    = _buffer.posllh.longitude;
-        state.location.lat    = _buffer.posllh.latitude;
-        state.location.alt    = _buffer.posllh.altitude_msl / 10;
-        state.status          = next_fix;
-        _new_position = true;
+        if(!haveHpposMsg){
+          _last_pos_time        = _buffer.posllh.itow;
+          state.location.lng    = _buffer.posllh.longitude;
+          state.location.lat    = _buffer.posllh.latitude;
+          state.location.alt    = _buffer.posllh.altitude_msl / 10;
+          state.status          = next_fix;
+          _new_position = true;
+        }
         state.horizontal_accuracy = _buffer.posllh.horizontal_accuracy*1.0e-3f;
         state.vertical_accuracy = _buffer.posllh.vertical_accuracy*1.0e-3f;
         state.have_horizontal_accuracy = true;
@@ -1421,6 +1423,7 @@ AP_GPS_UBLOX::_parse_gps(void)
           state.location.lng    = _buffer.pvt.lon;
           state.location.lat    = _buffer.pvt.lat;
           state.location.alt    = _buffer.pvt.h_msl / 10;
+          _new_position = true;
           }
         switch (_buffer.pvt.fix_type)
         {
@@ -1455,7 +1458,6 @@ AP_GPS_UBLOX::_parse_gps(void)
                 break;
         }
         next_fix = state.status;
-        _new_position = true;
         state.horizontal_accuracy = _buffer.pvt.h_acc*1.0e-3f;
         state.vertical_accuracy = _buffer.pvt.v_acc*1.0e-3f;
         state.have_horizontal_accuracy = true;
