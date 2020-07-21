@@ -239,7 +239,7 @@ void NavEKF3_core::readMagData()
 {
     if (!_ahrs->get_compass()) {
         allMagSensorsFailed = true;
-        return;        
+        return;
     }
     // If we are a vehicle with a sideslip constraint to aid yaw estimation and we have timed out on our last avialable
     // magnetometer, then declare the magnetometers as failed for this flight
@@ -260,7 +260,7 @@ void NavEKF3_core::readMagData()
         yawAlignComplete = false;
         InitialiseVariablesMag();
     }
-    
+
     // limit compass update rate to prevent high processor loading because magnetometer fusion is an expensive step and we could overflow the FIFO buffer
     if (use_compass() && ((_ahrs->get_compass()->last_update_usec() - lastMagUpdate_us) > 1000 * frontend->sensorIntervalMin_ms)) {
         frontend->logging.log_compass = true;
@@ -384,10 +384,14 @@ void NavEKF3_core::readIMUData()
     // update the inactive bias states
     learnInactiveBiases();
 
+    if (!yawAlignComplete && effective_magCal() == MagCal::EXTERNAL_YAW_FALLBACK && !inFlight) {
+        updateZGyroBias();
+    }
+
     readDeltaVelocity(accel_index_active, imuDataNew.delVel, imuDataNew.delVelDT);
     accelPosOffset = ins.get_imu_pos_offset(accel_index_active);
     imuDataNew.accel_index = accel_index_active;
-    
+
     // Get delta angle data from primary gyro or primary if not available
     readDeltaAngle(gyro_index_active, imuDataNew.delAng);
     imuDataNew.delAngDT = MAX(ins.get_delta_angle_dt(gyro_index_active),1.0e-4f);
@@ -466,7 +470,7 @@ void NavEKF3_core::readIMUData()
         imuDataDelayed.delVelDT = MAX(imuDataDelayed.delVelDT,minDT);
 
         updateTimingStatistics();
-        
+
         // correct the extracted IMU data for sensor errors
         delAngCorrected = imuDataDelayed.delAng;
         delVelCorrected = imuDataDelayed.delVel;
@@ -1038,4 +1042,38 @@ float NavEKF3_core::MagDeclination(void) const
         return 0;
     }
     return _ahrs->get_compass()->get_declination();
+}
+
+/*
+  update earth frame yaw gyro bias. This is only used for
+  MagCal::EXTERNAL_YAW_FALLBACK, when not flying and when we have not
+  yet done a yaw alignment. It prevents a buildup of a large gyro bias
+  for gyro axes that can't be corrected using the accelerometers while
+  waiting for GPS yaw
+ */
+void NavEKF3_core::updateZGyroBias(void)
+{
+    const float zgyro_learn_limit = radians(3);
+    const AP_InertialSensor &ins = AP::ins();
+    /*
+      get corrected gyro
+     */
+    Vector3f gyro = ins.get_gyro(gyro_index_active) - (stateStruct.gyro_bias / dtEkfAvg);
+    /*
+      we want to push the corrected gyro towards zero, but only in the
+      Z earth axis. Rotate the gyro to earth frame, then zero x,y
+      components then rotate back
+     */
+    Matrix3f rot;
+    stateStruct.quat.rotation_matrix(rot);
+    gyro = rot.transposed() * gyro;
+    gyro.x = 0;
+    gyro.y = 0;
+    gyro = rot * gyro;
+    if (gyro.length_squared() > sq(zgyro_learn_limit)) {
+        // more than 3 degrees/second rotation, don't update. We
+        // assume the vehicle really is moving
+        return;
+    }
+    stateStruct.gyro_bias += gyro * 1.0e-4 * dtEkfAvg;
 }

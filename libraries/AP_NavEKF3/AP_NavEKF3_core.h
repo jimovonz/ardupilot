@@ -62,6 +62,12 @@
 // mag fusion final reset altitude (using NED frame so altitude is negative)
 #define EKF3_MAG_FINAL_RESET_ALT 2.5f
 
+// learning rate for mag biases when using GPS yaw
+#define EK3_GPS_MAG_LEARN_RATE 0.005f
+
+// learning limit for mag biases when using GPS yaw (Gauss)
+#define EK3_GPS_MAG_LEARN_LIMIT 0.02f
+
 class AP_AHRS;
 
 class NavEKF3_core : public NavEKF_core_common
@@ -72,7 +78,7 @@ public:
 
     // setup this core backend
     bool setup_core(uint8_t _imu_index, uint8_t _core_index);
-    
+
     // Initialise the states from accelerometer and magnetometer data (if present)
     // This method can only be used when the vehicle is static
     bool InitialiseFilterBootstrap(void);
@@ -367,6 +373,17 @@ public:
     // get timing statistics structure
     void getTimingStatistics(struct ekf_timing &timing);
 
+    // values for EK3_MAG_CAL
+    enum class MagCal {
+        WHEN_FLYING = 0,
+        WHEN_MANOEUVRING = 1,
+        NEVER = 2,
+        AFTER_FIRST_CLIMB = 3,
+        ALWAYS = 4,
+        EXTERNAL_YAW = 5,
+        EXTERNAL_YAW_FALLBACK = 6,
+    };
+
 private:
     // Reference to the global EKF frontend for parameters
     NavEKF3 *frontend;
@@ -524,7 +541,7 @@ private:
         float           delTime;    // time interval that the measurement was accumulated over (sec)
         uint32_t        time_ms;    // measurement timestamp (msec)
     };
-        
+
     struct yaw_elements {
         float       yawAng;         // yaw angle measurement (rad)
         float       yawAngErr;      // yaw angle 1SD measurement accuracy (rad)
@@ -830,11 +847,11 @@ private:
     void recordMagReset();
 
     // effective value of MAG_CAL
-    uint8_t effective_magCal(void) const;
+    MagCal effective_magCal(void) const;
 
     // calculate the variances for the rotation vector equivalent
     Vector3f calcRotVecVariances(void);
-    
+
     // initialise the quaternion covariances using rotation vector variances
     void initialiseQuatCovariances(const Vector3f &rotVarVec);
 
@@ -1300,10 +1317,28 @@ private:
 
     // timing statistics
     struct ekf_timing timing;
-    
+
     // should we assume zero sideslip?
     bool assume_zero_sideslip(void) const;
 
     // vehicle specific initial gyro bias uncertainty
     float InitialGyroBiasUncertainty(void) const;
+
+    /*
+      learn magnetometer biases from GPS yaw. Return true if the
+      resulting mag vector is close enough to the one predicted by GPS
+      yaw to use it for fallback
+    */
+    bool learnMagBiasFromGPS(void);
+
+    uint32_t last_gps_yaw_fusion_ms;
+    bool gps_yaw_mag_fallback_ok;
+    bool gps_yaw_mag_fallback_active;
+    uint8_t gps_yaw_fallback_good_counter;
+
+    /*
+      learn Z gyro bias when not flying and when no yaw alignment has
+      been done with EXTERNAL_YAW_FALLBACK
+     */
+    void updateZGyroBias(void);
 };

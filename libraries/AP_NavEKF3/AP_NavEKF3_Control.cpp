@@ -40,14 +40,16 @@ void NavEKF3_core::controlFilterModes()
 /*
   return effective value for _magCal for this core
  */
-uint8_t NavEKF3_core::effective_magCal(void) const
+NavEKF3_core::MagCal NavEKF3_core::effective_magCal(void) const
 {
+    MagCal magcal = MagCal(frontend->_magCal.get());
+
     // force use of simple magnetic heading fusion for specified cores
-    if (frontend->_magMask & core_index) {
-        return 2;
-    } else {
-        return frontend->_magCal;
+    if (magcal != MagCal::EXTERNAL_YAW && (frontend->_magMask & core_index)) {
+        return MagCal::NEVER;
     }
+
+    return magcal;
 }
 
 // Determine if learning of wind and magnetic field will be enabled and set corresponding indexing limits to
@@ -92,16 +94,17 @@ void NavEKF3_core::setWindMagStateLearningMode()
     }
 
     // Determine if learning of magnetic field states has been requested by the user
-    uint8_t magCal = effective_magCal();
+    MagCal magCal = effective_magCal();
     bool magCalRequested =
-            ((magCal == 0) && inFlight) || // when flying
-            ((magCal == 1) && manoeuvring)  || // when manoeuvring
-            ((magCal == 3) && finalInflightYawInit && finalInflightMagInit) || // when initial in-air yaw and mag field reset is complete
-            (magCal == 4); // all the time
+        ((magCal == MagCal::WHEN_FLYING) && inFlight) || // when flying
+        ((magCal == MagCal::WHEN_MANOEUVRING) && manoeuvring)  || // when manoeuvring
+        ((magCal == MagCal::AFTER_FIRST_CLIMB) && finalInflightYawInit && finalInflightMagInit) || // when initial in-air yaw and mag field reset is complete
+        ((magCal == MagCal::EXTERNAL_YAW_FALLBACK) && inFlight) ||
+        (magCal == MagCal::ALWAYS); // all the time
 
     // Deny mag calibration request if we aren't using the compass, it has been inhibited by the user,
     // we do not have an absolute position reference or are on the ground (unless explicitly requested by the user)
-    bool magCalDenied = !use_compass() || (magCal == 2) || (onGround && magCal != 4);
+    bool magCalDenied = !use_compass() || (magCal == MagCal::NEVER) || (onGround && magCal != MagCal::ALWAYS);
 
     // Inhibit the magnetic field calibration if not requested or denied
     bool setMagInhibit = !magCalRequested || magCalDenied;
@@ -564,4 +567,3 @@ void  NavEKF3_core::updateFilterStatus(void)
     filterStatus.flags.gps_glitching = !gpsAccuracyGood && (PV_AidingMode == AID_ABSOLUTE) && (frontend->_fusionModeGPS != 3); // GPS glitching is affecting navigation accuracy
     filterStatus.flags.gps_quality_good = gpsGoodToAlign;
 }
-
