@@ -108,6 +108,10 @@ bool GCS_MAVLINK::init(uint8_t instance)
         return false;
     }
 
+    if (!serial_manager.should_forward_mavlink_telemetry(protocol, instance)) {
+        set_channel_private(chan);
+    }
+
     /*
       Now try to cope with SiK radios that may be stuck in bootloader
       mode because CTS was held while powering on. This tells the
@@ -2220,15 +2224,15 @@ void GCS_MAVLINK::send_autopilot_version() const
                         (uint32_t)(version.fw_type) << (8 * 0);
 
     if (version.fw_hash_str) {
-        strncpy(flight_custom_version, version.fw_hash_str, ARRAY_SIZE(flight_custom_version));
+        strncpy_noterm(flight_custom_version, version.fw_hash_str, ARRAY_SIZE(flight_custom_version));
     }
 
     if (version.middleware_hash_str) {
-        strncpy(middleware_custom_version, version.middleware_hash_str, ARRAY_SIZE(middleware_custom_version));
+        strncpy_noterm(middleware_custom_version, version.middleware_hash_str, ARRAY_SIZE(middleware_custom_version));
     }
 
     if (version.os_hash_str) {
-        strncpy(os_custom_version, version.os_hash_str, ARRAY_SIZE(os_custom_version));
+        strncpy_noterm(os_custom_version, version.os_hash_str, ARRAY_SIZE(os_custom_version));
     }
 
     mavlink_msg_autopilot_version_send(
@@ -3435,6 +3439,13 @@ void GCS_MAVLINK::send_banner()
     char banner_msg[50];
     if (hal.rcout->get_output_mode_banner(banner_msg, sizeof(banner_msg))) {
         send_text(MAV_SEVERITY_INFO, "%s", banner_msg);
+    }
+
+    // output any fast sampling status messages
+    for (uint8_t i = 0; i < INS_MAX_BACKENDS; i++) {
+        if (AP::ins().get_output_banner(i, banner_msg, sizeof(banner_msg))) {
+            send_text(MAV_SEVERITY_INFO, "%s", banner_msg);
+        }
     }
 }
 
