@@ -273,8 +273,8 @@ void Location::offset(float ofs_north, float ofs_east)
 {
         double dlat = (ofs_north * LOCATION_SCALING_FACTOR_LAT_INV);
         double dlng = ((ofs_east * LOCATION_SCALING_FACTOR_LNG_INV)/ longitude_scale());
-        double hplat = (double) lat - (double) 0.05f; //(lat_hp / 100.0f);
-        double hplng = (double)lng + (double) 0.08f; //(lng_hp / 100.0f);
+        double hplat = (double) lat + (lat_hp / 100.0f);
+        double hplng = (double)lng + (lng_hp / 100.0f);
 
         hplat += dlat;
         hplng += dlng;
